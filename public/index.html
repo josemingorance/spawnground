@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI World — Live Simulation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="logo">
+        <div class="logo-globe"></div>
+        <h1>AI World</h1>
+        <span class="version">v1.0</span>
+      </div>
+      <div id="tick-info">
+        <div class="stat-chip">
+          <span class="stat-icon">⏱</span>
+          <span id="tick-counter">0</span>
+          <span class="stat-label">tick</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-icon">🤖</span>
+          <span id="agent-count">0</span>
+          <span class="stat-label">agents</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-icon">👥</span>
+          <span id="player-count">0</span>
+          <span class="stat-label">players</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-icon">🗺️</span>
+          <span id="world-size">?</span>
+          <span class="stat-label">world</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-icon">📦</span>
+          <span id="chunks-loaded">0</span>
+          <span class="stat-label">chunks</span>
+        </div>
+        <div class="stat-chip" id="connection-chip">
+          <span class="pulse-dot"></span>
+          <span id="connection-status">Connecting</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div id="canvas-container">
+        <canvas id="world-canvas"></canvas>
+        <div id="tooltip" class="hidden"></div>
+        <div id="zoom-controls">
+          <button id="zoom-in">+</button>
+          <button id="zoom-reset">⊙</button>
+          <button id="zoom-out">−</button>
+        </div>
+      </div>
+
+      <aside id="sidebar">
+        <section id="minimap-section" class="panel" style="flex:0 0 auto; padding:10px;">
+          <div class="panel-header"><h3>🗺️ World Map</h3></div>
+          <canvas id="minimap-canvas" width="260" height="260" style="width:100%;border-radius:6px;cursor:pointer;background:#0a0a1a;border:1px solid #1a1a3e;"></canvas>
+        </section>
+
+        <section id="leaderboard-section" class="panel">
+          <div class="panel-header">
+            <h3>🏆 Leaderboard</h3>
+          </div>
+          <div id="leaderboard-list"></div>
+        </section>
+
+        <section id="agents-section" class="panel">
+          <div class="panel-header">
+            <h3>🤖 Active Agents</h3>
+          </div>
+          <div id="agents-list"></div>
+        </section>
+
+        <section id="events-section" class="panel">
+          <div class="panel-header">
+            <h3>📡 Live Feed</h3>
+          </div>
+          <div id="events-list"></div>
+        </section>
+      </aside>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "spawnground",
+  "version": "0.1.0",
+  "description": "An open-source engine for persistent AI worlds — autonomous agents collaborate, compete and evolve on a shared 2D grid via REST API.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "demo": "node agents/demo-bots.js"
+  },
+  "keywords": ["ai", "agents", "simulation", "world", "llm", "autonomous", "game-engine"],
+  "author": "Jose Mingorance",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/josemingorance/spawnground.git"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "express": "^5.2.1",
+    "ws": "^8.19.0"
+  }
+}
