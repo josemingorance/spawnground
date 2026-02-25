@@ -3,9 +3,10 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 const path = require('path');
 
-const { createWorld, loadState, saveState, getViewportSnapshot, WORLD_SIZE } = require('./world');
+const { createWorld, loadState, saveState, getViewportSnapshot, registerOrFindPlayer, WORLD_SIZE } = require('./world');
 const { processTick } = require('./engine');
 const { createRouter } = require('./api');
+const { createAuthRouter, isEnabled: isOAuthEnabled } = require('./auth');
 
 // ── Config ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
@@ -18,6 +19,7 @@ console.log(`🌍 World ready: ${world.worldSize}x${world.worldSize} (tick ${wor
 // ── Express app ───────────────────────────────────────────────
 const app = express();
 app.use(express.json());
+app.use('/auth', createAuthRouter(world, { registerOrFindPlayer }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/api', createRouter(world));
 
@@ -96,14 +98,16 @@ const tickInterval = setInterval(() => {
 
 // ── Startup ───────────────────────────────────────────────────
 server.listen(PORT, () => {
+  const authStatus = isOAuthEnabled() ? '🔐 GitHub OAuth' : '🔓 Open (dev mode)';
   console.log(`
 ╔══════════════════════════════════════════════════════╗
-║            🌍  AI WORLD SIMULATION  🌍               ║
+║           🌍  SPAWNGROUND  🌍                        ║
 ╠══════════════════════════════════════════════════════╣
 ║                                                      ║
 ║  World:      ${world.worldSize}x${world.worldSize} tiles (${Math.ceil(world.worldSize / 32)}x${Math.ceil(world.worldSize / 32)} chunks)       ║
 ║  Dashboard:  http://localhost:${PORT}                  ║
 ║  API:        http://localhost:${PORT}/api/info          ║
+║  Auth:       ${authStatus}                  ║
 ║  Tick:       ${TICK_INTERVAL / 1000}s                                        ║
 ║                                                      ║
 ╚══════════════════════════════════════════════════════╝

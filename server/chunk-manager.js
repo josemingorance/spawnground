@@ -249,6 +249,9 @@ function getAgentsInRect(agents, vx, vy, vw, vh) {
       result.push({
         id: a.id,
         playerName: a.playerName,
+        nickname: a.nickname,
+        githubLogin: a.githubLogin,
+        avatarUrl: a.avatarUrl,
         x: a.x - vx, // relative to viewport
         y: a.y - vy,
         ax: a.x,      // absolute coords too

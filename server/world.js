@@ -126,7 +126,7 @@ function getPlayerState(world, playerId) {
   };
 }
 
-// ── Register player ───────────────────────────────────────────
+// ── Register player (anonymous, dev mode) ────────────────────
 function registerPlayer(world, name) {
   const playerId = `p${world.nextPlayerId++}`;
   const token = generateToken();
@@ -140,8 +140,36 @@ function registerPlayer(world, name) {
   return { playerId, token };
 }
 
+// ── Register or find player by GitHub identity ───────────────
+function registerOrFindPlayer(world, { githubId, githubLogin, avatarUrl }) {
+  // Find existing player by GitHub ID
+  const existing = Object.values(world.players).find((p) => p.githubId === githubId);
+  if (existing) {
+    // Update in case username/avatar changed
+    existing.name = githubLogin;
+    existing.githubLogin = githubLogin;
+    existing.avatarUrl = avatarUrl;
+    return existing;
+  }
+
+  // Create new player
+  const playerId = `p${world.nextPlayerId++}`;
+  const token = generateToken();
+  world.players[playerId] = {
+    id: playerId,
+    githubId,
+    githubLogin,
+    avatarUrl,
+    name: githubLogin,
+    token,
+    agentIds: [],
+    joinedAt: Date.now(),
+  };
+  return world.players[playerId];
+}
+
 // ── Spawn agent ───────────────────────────────────────────────
-function spawnAgent(world, playerId) {
+function spawnAgent(world, playerId, nickname) {
   const player = world.players[playerId];
   if (!player) return null;
   if (player.agentIds.length >= 3) {
@@ -156,7 +184,20 @@ function spawnAgent(world, playerId) {
     attempts++;
   } while (attempts < 50 && Object.values(world.agents).some((a) => a.x === x && a.y === y));
 
-  const agent = { id: agentId, playerId, playerName: player.name, x, y, ...AGENT_DEFAULTS };
+  const displayName = player.githubLogin
+    ? `@${player.githubLogin}`
+    : player.name;
+
+  const agent = {
+    id: agentId,
+    playerId,
+    playerName: displayName,
+    nickname: nickname || `Agent-${agentId}`,
+    githubLogin: player.githubLogin || null,
+    avatarUrl: player.avatarUrl || null,
+    x, y,
+    ...AGENT_DEFAULTS,
+  };
   world.agents[agentId] = agent;
   player.agentIds.push(agentId);
   return { agent };
@@ -184,10 +225,13 @@ function getViewportSnapshot(world, viewport) {
     viewport: { x: vx, y: vy, w: vw, h: vh },
     agents: cm.getAgentsInRect(world.agents, vx, vy, vw, vh),
     all_agents_summary: Object.values(world.agents).map((a) => ({
-      id: a.id, playerName: a.playerName, x: a.x, y: a.y,
+      id: a.id, playerName: a.playerName, nickname: a.nickname,
+      githubLogin: a.githubLogin, avatarUrl: a.avatarUrl,
+      x: a.x, y: a.y,
     })),
     players: Object.values(world.players).map((p) => ({
-      id: p.id, name: p.name, agentCount: p.agentIds.length,
+      id: p.id, name: p.name, githubLogin: p.githubLogin,
+      avatarUrl: p.avatarUrl, agentCount: p.agentIds.length,
     })),
     biome_map: cm.buildBiomeMapRect(world.worldSeed, world.worldSize, vx, vy, vw, vh),
     solar_map: cm.buildSolarMapRect(world.worldSeed, world.worldSize, vx, vy, vw, vh),
@@ -200,7 +244,8 @@ function getViewportSnapshot(world, viewport) {
 function getLeaderboard(world) {
   return Object.values(world.agents)
     .map((a) => ({
-      id: a.id, playerName: a.playerName,
+      id: a.id, playerName: a.playerName, nickname: a.nickname,
+      githubLogin: a.githubLogin, avatarUrl: a.avatarUrl,
       health: a.health, energy: a.energy, wealth: a.wealth,
       score: a.health + a.energy + a.wealth,
     }))
@@ -297,6 +342,7 @@ module.exports = {
   getNearbyAgents,
   getPlayerState,
   registerPlayer,
+  registerOrFindPlayer,
   spawnAgent,
   getPlayerByToken,
   getViewportSnapshot,

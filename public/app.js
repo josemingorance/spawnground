@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════
-// AI WORLD — Dashboard Renderer (Chunk-based, viewport-aware)
+// SPAWNGROUND — Dashboard Renderer (Chunk-based, viewport-aware)
 // ═══════════════════════════════════════════════════════════════
 
 const canvas = document.getElementById('world-canvas');
@@ -11,6 +11,104 @@ let prevAgentPositions = {};
 let animFrame = 0;
 let particles = [];
 let ws = null;
+
+// ── Auth / Token management ──────────────────────────────────
+(function initAuth() {
+  // Read token from ?token= URL param (OAuth callback)
+  const params = new URLSearchParams(window.location.search);
+  const urlToken = params.get('token');
+  if (urlToken) {
+    localStorage.setItem('sg_token', urlToken);
+    // Clean URL without reloading
+    window.history.replaceState({}, '', '/');
+  }
+
+  // Check auth status and update UI
+  fetch('/auth/info')
+    .then((r) => r.json())
+    .then((info) => {
+      const loginBtn = document.getElementById('login-btn');
+      const userInfo = document.getElementById('user-info');
+      const token = localStorage.getItem('sg_token');
+
+      if (info.enabled && !token) {
+        // OAuth enabled, user not logged in — show login button
+        loginBtn.classList.remove('hidden');
+      } else if (token) {
+        // User has token — try to get their identity from server
+        fetch('/api/state', { headers: { Authorization: `Bearer ${token}` } })
+          .then((r) => r.ok ? r.json() : null)
+          .then((state) => {
+            if (!state) {
+              // Invalid token
+              localStorage.removeItem('sg_token');
+              if (info.enabled) loginBtn.classList.remove('hidden');
+              return;
+            }
+            // Find our player info from controlled agents
+            if (state.controlled_agents && state.controlled_agents.length > 0) {
+              // We have agents — but state doesn't include player-level info
+              // Use world state which has players array
+            }
+          })
+          .catch(() => {});
+
+        // Also check via world state once connected
+        window._sgToken = token;
+      }
+    })
+    .catch(() => {
+      // Auth endpoint not available (older server) — no-op
+    });
+})();
+
+function updateAuthUI(worldStateData) {
+  if (!worldStateData || !worldStateData.players) return;
+  const token = localStorage.getItem('sg_token');
+  if (!token) return;
+
+  // Find our player in the players list by checking if we match any token
+  // Since tokens aren't exposed in world state, we use a separate fetch
+  // But we can also check if we already set user info
+  const userInfo = document.getElementById('user-info');
+  const loginBtn = document.getElementById('login-btn');
+  if (userInfo.dataset.loaded) return;
+
+  fetch('/api/state', { headers: { Authorization: `Bearer ${token}` } })
+    .then((r) => r.ok ? r.json() : null)
+    .then((state) => {
+      if (!state) return;
+      // The /api/state response doesn't include player identity directly
+      // Let's use a simpler approach — find player in world state players list
+      // We'll match by checking each player's agents against our controlled agents
+      if (state.controlled_agents && state.controlled_agents.length > 0) {
+        const myAgentIds = state.controlled_agents.map((a) => a.id);
+        const myPlayer = worldStateData.players.find((p) => {
+          // Check if any of our agents belong to this player by looking at agent data
+          return worldStateData.all_agents_summary &&
+            worldStateData.all_agents_summary.some((a) =>
+              myAgentIds.includes(a.id) && a.githubLogin
+            );
+        });
+
+        // Simpler: find agent with our ID and get its githubLogin
+        const myAgent = (worldStateData.all_agents_summary || []).find((a) =>
+          myAgentIds.includes(a.id)
+        );
+
+        if (myAgent && myAgent.githubLogin) {
+          const avatarEl = document.getElementById('user-avatar');
+          const nameEl = document.getElementById('user-name');
+          avatarEl.src = myAgent.avatarUrl || '';
+          nameEl.textContent = `@${myAgent.githubLogin}`;
+          userInfo.classList.remove('hidden');
+          loginBtn.classList.add('hidden');
+          userInfo.dataset.loaded = 'true';
+        }
+      }
+    })
+    .catch(() => {});
+}
 
 // Viewport state (in world tile coordinates)
 let worldSize = 1024;
@@ -337,11 +435,20 @@ function render() {
       ctx.fillText(`${agent.id}`, drawX, drawY);
       ctx.shadowBlur = 0;
 
-      // Name
+      // Name (nickname if available, otherwise playerName)
+      const displayLabel = agent.nickname && agent.nickname !== `Agent-${agent.id}`
+        ? agent.nickname
+        : (agent.playerName || '');
       ctx.font = `600 ${Math.max(7, cellW * 1)}px 'Inter', sans-serif`;
       ctx.fillStyle = 'rgba(255,255,255,0.85)';
       ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 3;
-      ctx.fillText(agent.playerName || '', drawX, drawY - radius - 8);
+      ctx.fillText(displayLabel, drawX, drawY - radius - 8);
+      // Owner line (smaller, muted)
+      if (agent.githubLogin) {
+        ctx.font = `500 ${Math.max(6, cellW * 0.75)}px 'JetBrains Mono', monospace`;
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.fillText(`@${agent.githubLogin}`, drawX, drawY - radius - 18);
+      }
       ctx.shadowBlur = 0;
 
       // Health + Energy bars
@@ -468,8 +575,10 @@ canvas.addEventListener('mousemove', (e) => {
   }
   for (const a of agentsHere) {
     const c = getPlayerColor(a.playerName);
+    const nick = a.nickname || `Agent-${a.id}`;
+    const owner = a.githubLogin ? `@${a.githubLogin}` : (a.playerName || '');
     html += `<div class="tt-agent">`;
-    html += `<strong style="color:${c.fill}">🤖 #${a.id}</strong> <span style="color:#888">${a.playerName}</span>`;
+    html += `<strong style="color:${c.fill}">🤖 ${nick}</strong> <span style="color:#888">${owner}</span>`;
     html += `<div class="tt-resources">`;
     html += `<span class="tt-res">❤️${a.health}</span>`;
     html += `<span class="tt-res">⚡${a.energy}</span>`;
@@ -530,10 +639,19 @@ function updateLeaderboard(agents) {
     const medal = medals[i] || `<span style="color:#555">${i + 1}</span>`;
     const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
     const color = getPlayerColor(a.playerName);
+    const nick = a.nickname || `Agent-${a.id}`;
+    const avatarHtml = a.avatarUrl
+      ? `<img class="lb-avatar" src="${a.avatarUrl}&s=44" alt="">`
+      : '';
+    const ownerHtml = a.githubLogin
+      ? `<div class="lb-owner">@${a.githubLogin}</div>`
+      : '';
     return `<div class="lb-entry ${rankClass}">
       <div class="lb-rank">${medal}</div>
+      ${avatarHtml}
       <div class="lb-info">
-        <div class="lb-name" style="color:${color.fill}">#${a.id} ${a.playerName}</div>
+        <div class="lb-name" style="color:${color.fill}">${nick}</div>
+        ${ownerHtml}
         <div class="lb-bar"><div class="lb-bar-fill wealth" style="width:${(score / 300) * 100}%"></div></div>
       </div>
       <div class="lb-score">${score}</div>
@@ -546,9 +664,11 @@ function updateAgentCards(agents) {
   if (!agents || agents.length === 0) return;
   list.innerHTML = agents.map((a) => {
     const color = getPlayerColor(a.playerName);
+    const nick = a.nickname || `Agent-${a.id}`;
+    const ownerTag = a.githubLogin ? `<span class="agent-owner">@${a.githubLogin}</span>` : '';
     return `<div class="agent-card" style="border-left:3px solid ${color.fill}">
       <div class="agent-top">
-        <span class="agent-id" style="color:${color.fill}">#${a.id} ${a.playerName}</span>
+        <span class="agent-id" style="color:${color.fill}">${nick} ${ownerTag}</span>
         <span class="agent-pos">[${a.ax},${a.ay}]</span>
       </div>
       <div class="agent-bars">
@@ -601,9 +721,7 @@ function connect() {
       }
 
       updateUI(state);
-      // Use all_agents_summary for leaderboard (has all agents, not just viewport)
-      const allAgents = state.all_agents_summary || state.agents || [];
-      // For leaderboard we need stats — use viewport agents + any cached
+      updateAuthUI(state);
       updateLeaderboard(state.agents);
       updateAgentCards(state.agents);
 

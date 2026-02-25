@@ -1,9 +1,10 @@
 const express = require('express');
 const {
-  registerPlayer, spawnAgent, getPlayerByToken,
+  registerPlayer, registerOrFindPlayer, spawnAgent, getPlayerByToken,
   getPlayerState, getViewportSnapshot, getLeaderboard, WORLD_SIZE,
 } = require('./world');
 const { queueActions, COSTS } = require('./engine');
+const { isEnabled: isOAuthEnabled } = require('./auth');
 const cm = require('./chunk-manager');
 
 function createRouter(world) {
@@ -22,6 +23,15 @@ function createRouter(world) {
 
   // POST /api/join
   router.post('/join', (req, res) => {
+    // If OAuth is enabled, reject anonymous joins
+    if (isOAuthEnabled()) {
+      return res.status(403).json({
+        error: 'Anonymous join is disabled. Use GitHub OAuth to authenticate.',
+        auth_url: '/auth/github',
+        device_flow: 'POST /auth/device/start',
+      });
+    }
+
     const { name } = req.body || {};
     const { playerId, token } = registerPlayer(world, name);
     const player = world.players[playerId];
@@ -34,14 +44,17 @@ function createRouter(world) {
 
   // POST /api/spawn
   router.post('/spawn', authMiddleware, (req, res) => {
-    const result = spawnAgent(world, req.player.id);
+    const { nickname } = req.body || {};
+    const result = spawnAgent(world, req.player.id, nickname);
     if (result.error) return res.status(400).json({ error: result.error });
     const { agent } = result;
-    console.log(`🤖 Agent #${agent.id} spawned for ${req.player.name} at [${agent.x}, ${agent.y}]`);
+    console.log(`🤖 ${agent.nickname} (#${agent.id}) spawned for ${req.player.name} at [${agent.x}, ${agent.y}]`);
     res.json({
-      agent_id: agent.id, x: agent.x, y: agent.y,
+      agent_id: agent.id, nickname: agent.nickname,
+      x: agent.x, y: agent.y,
       health: agent.health, energy: agent.energy, wealth: agent.wealth,
-      message: `Agent #${agent.id} spawned at [${agent.x}, ${agent.y}]. World is ${world.worldSize}x${world.worldSize}.`,
+      owner: agent.githubLogin || req.player.name,
+      message: `${agent.nickname} (#${agent.id}) spawned at [${agent.x}, ${agent.y}]. World is ${world.worldSize}x${world.worldSize}.`,
     });
   });
 
@@ -94,8 +107,8 @@ function createRouter(world) {
   // GET /api/info
   router.get('/info', (req, res) => {
     res.json({
-      name: 'AI World Simulation',
-      version: '2.0.0',
+      name: 'Spawnground',
+      version: '0.2.0',
       grid_size: world.worldSize,
       world_size: world.worldSize,
       chunk_size: world.chunkSize,
@@ -103,6 +116,7 @@ function createRouter(world) {
       total_players: Object.keys(world.players).length,
       total_agents: Object.keys(world.agents).length,
       chunk_stats: cm.getChunkStats(),
+      auth: { github_oauth: isOAuthEnabled() },
       action_costs: COSTS,
       rules: {
         max_agents_per_player: 3,
