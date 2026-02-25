@@ -694,7 +694,8 @@ function connect() {
 
       updateUI(state);
       updateAuthUI(state);
-      updateLeaderboard(state.agents);
+      // Leaderboard uses all agents (not just viewport); agent cards show viewport only
+      updateLeaderboard(state.all_agents_summary || state.agents);
       updateAgentCards(state.agents);
 
       if (msg.type === 'tick' && msg.data.results) {

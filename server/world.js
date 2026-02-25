@@ -229,6 +229,7 @@ function getViewportSnapshot(world, viewport) {
       id: a.id, playerName: a.playerName, nickname: a.nickname,
       githubLogin: a.githubLogin, avatarUrl: a.avatarUrl,
       x: a.x, y: a.y,
+      health: a.health, energy: a.energy, wealth: a.wealth,
     })),
     players: Object.values(world.players).map((p) => ({
       id: p.id, name: p.name, githubLogin: p.githubLogin,
