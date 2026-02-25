@@ -62,7 +62,7 @@ wss.on('connection', (ws) => {
           data: getViewportSnapshot(world, ws.viewport),
         }));
       }
-    } catch (e) { /* ignore bad messages */ }
+    } catch (e) { /* ignore malformed JSON from clients */ }
   });
 
   ws.on('close', () => {
@@ -71,7 +71,7 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Per-client broadcast with viewport-scoped data
+// Broadcast tick results to each client, scoped to their viewport
 function broadcastTick(tickResult) {
   for (const client of clients) {
     if (client.readyState !== 1) continue;
@@ -83,7 +83,7 @@ function broadcastTick(tickResult) {
           world: getViewportSnapshot(world, client.viewport),
         },
       }));
-    } catch (e) { /* skip broken clients */ }
+    } catch (e) { /* skip disconnected clients */ }
   }
 }
 

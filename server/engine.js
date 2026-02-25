@@ -1,7 +1,7 @@
 const { getTileAt } = require('./world');
 const cm = require('./chunk-manager');
 
-// Action costs
+// Action energy and material costs
 const COSTS = {
   move: { energy: 5 },
   farm: { energy: 10 },
@@ -48,7 +48,7 @@ function processTick(world) {
       agent.health = Math.max(0, agent.health - 2);
     }
 
-    // Slow resource regen
+    // Natural tile resource regeneration
     tile.energy = Math.min(100, tile.energy + 1);
     tile.food = Math.min(100, tile.food + 1);
     tile.materials = Math.min(100, tile.materials + 0.5);

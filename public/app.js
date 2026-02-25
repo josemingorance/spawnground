@@ -14,97 +14,69 @@ let ws = null;
 
 // ── Auth / Token management ──────────────────────────────────
 (function initAuth() {
-  // Read token from ?token= URL param (OAuth callback)
+  // Capture token from OAuth callback URL (?token=xxx) and persist it
   const params = new URLSearchParams(window.location.search);
   const urlToken = params.get('token');
   if (urlToken) {
     localStorage.setItem('sg_token', urlToken);
-    // Clean URL without reloading
     window.history.replaceState({}, '', '/');
   }
 
-  // Check auth status and update UI
+  // Show login button or user info depending on auth state
   fetch('/auth/info')
     .then((r) => r.json())
     .then((info) => {
       const loginBtn = document.getElementById('login-btn');
-      const userInfo = document.getElementById('user-info');
       const token = localStorage.getItem('sg_token');
 
       if (info.enabled && !token) {
-        // OAuth enabled, user not logged in — show login button
         loginBtn.classList.remove('hidden');
       } else if (token) {
-        // User has token — try to get their identity from server
+        // Validate stored token; clear it if invalid
         fetch('/api/state', { headers: { Authorization: `Bearer ${token}` } })
           .then((r) => r.ok ? r.json() : null)
           .then((state) => {
             if (!state) {
-              // Invalid token
               localStorage.removeItem('sg_token');
               if (info.enabled) loginBtn.classList.remove('hidden');
-              return;
-            }
-            // Find our player info from controlled agents
-            if (state.controlled_agents && state.controlled_agents.length > 0) {
-              // We have agents — but state doesn't include player-level info
-              // Use world state which has players array
             }
           })
           .catch(() => {});
-
-        // Also check via world state once connected
+        // Identity will be resolved via updateAuthUI once WebSocket delivers world state
         window._sgToken = token;
       }
     })
-    .catch(() => {
-      // Auth endpoint not available (older server) — no-op
-    });
+    .catch(() => {}); // Auth endpoint unavailable (pre-0.2 server)
 })();
 
+// Resolve the logged-in player's identity from world state and display it in the header.
+// Called on every tick; sets dataset.loaded after first successful match to avoid repeated fetches.
 function updateAuthUI(worldStateData) {
   if (!worldStateData || !worldStateData.players) return;
   const token = localStorage.getItem('sg_token');
   if (!token) return;
 
-  // Find our player in the players list by checking if we match any token
-  // Since tokens aren't exposed in world state, we use a separate fetch
-  // But we can also check if we already set user info
   const userInfo = document.getElementById('user-info');
   const loginBtn = document.getElementById('login-btn');
   if (userInfo.dataset.loaded) return;
 
+  // Fetch our controlled agents, then match them to world state to get GitHub identity
   fetch('/api/state', { headers: { Authorization: `Bearer ${token}` } })
     .then((r) => r.ok ? r.json() : null)
     .then((state) => {
-      if (!state) return;
-      // The /api/state response doesn't include player identity directly
-      // Let's use a simpler approach — find player in world state players list
-      // We'll match by checking each player's agents against our controlled agents
-      if (state.controlled_agents && state.controlled_agents.length > 0) {
-        const myAgentIds = state.controlled_agents.map((a) => a.id);
-        const myPlayer = worldStateData.players.find((p) => {
-          // Check if any of our agents belong to this player by looking at agent data
-          return worldStateData.all_agents_summary &&
-            worldStateData.all_agents_summary.some((a) =>
-              myAgentIds.includes(a.id) && a.githubLogin
-            );
-        });
+      if (!state || !state.controlled_agents || state.controlled_agents.length === 0) return;
 
-        // Simpler: find agent with our ID and get its githubLogin
-        const myAgent = (worldStateData.all_agents_summary || []).find((a) =>
-          myAgentIds.includes(a.id)
-        );
+      const myAgentIds = state.controlled_agents.map((a) => a.id);
+      const myAgent = (worldStateData.all_agents_summary || []).find((a) =>
+        myAgentIds.includes(a.id)
+      );
 
-        if (myAgent && myAgent.githubLogin) {
-          const avatarEl = document.getElementById('user-avatar');
-          const nameEl = document.getElementById('user-name');
-          avatarEl.src = myAgent.avatarUrl || '';
-          nameEl.textContent = `@${myAgent.githubLogin}`;
-          userInfo.classList.remove('hidden');
-          loginBtn.classList.add('hidden');
-          userInfo.dataset.loaded = 'true';
-        }
+      if (myAgent && myAgent.githubLogin) {
+        document.getElementById('user-avatar').src = myAgent.avatarUrl || '';
+        document.getElementById('user-name').textContent = `@${myAgent.githubLogin}`;
+        userInfo.classList.remove('hidden');
+        loginBtn.classList.add('hidden');
+        userInfo.dataset.loaded = 'true';
       }
     })
     .catch(() => {});

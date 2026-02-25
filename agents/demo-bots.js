@@ -42,7 +42,7 @@ async function initBot(bot) {
   }
 }
 
-let maxCoord = 1023; // default, updated from /api/info on startup
+let maxCoord = 1023; // world size - 1, updated from /api/info on startup
 
 function decideActions(bot, state) {
   const actions = [];
@@ -55,7 +55,7 @@ function decideActions(bot, state) {
       case 'farmer': {
         // Farmer: prioritize food and health, farm a lot, stay put
         if (agent.energy < 15) {
-          // Rest — skip action to regen energy
+          // Rest: skip action to let energy regenerate
           break;
         }
         if (!tile || tile.food < 30) {
@@ -189,7 +189,7 @@ async function botTick(bot) {
 }
 
 async function main() {
-  console.log('\n🌍 === AI WORLD DEMO ===\n');
+  console.log('\n🌍 === SPAWNGROUND DEMO ===\n');
 
   // Fetch world size
   const info = await api('/info');
@@ -204,7 +204,7 @@ async function main() {
 
   console.log('\n🎮 Starting game loop (Ctrl+C to stop)...\n');
 
-  // Game loop — run every 4 seconds (slightly before 5s tick)
+  // Game loop: run every 4s (slightly before the 5s server tick)
   const interval = setInterval(async () => {
     const tick = await api('/info');
     console.log(`\n── Tick ${tick.tick} ──`);
@@ -221,7 +221,7 @@ async function main() {
     lb.slice(0, 6).forEach((entry, i) => {
       const medals = ['🥇', '🥈', '🥉'];
       const medal = medals[i] || `${i + 1}.`;
-      console.log(`   ${medal} #${entry.id} ${entry.playerName} — Score: ${entry.score}`);
+      console.log(`   ${medal} #${entry.id} ${entry.playerName} - Score: ${entry.score}`);
     });
   }, 20000);
 

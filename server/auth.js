@@ -85,7 +85,7 @@ function createAuthRouter(world, { registerOrFindPlayer }) {
         return res.json({ pending: true, error: data.error });
       }
 
-      // Got access token — resolve GitHub identity
+      // Access token obtained, resolve GitHub identity
       const player = await githubTokenToPlayer(world, data.access_token, registerOrFindPlayer);
       res.json({
         token: player.token,

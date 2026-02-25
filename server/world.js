@@ -7,6 +7,7 @@ const SAVE_DIR = path.join(__dirname, '..', 'world-data');
 const META_FILE = path.join(SAVE_DIR, 'meta.json');
 const CHUNKS_DIR = path.join(SAVE_DIR, 'chunks');
 
+const AGENT_VIEW_RADIUS = 5;
 const AGENT_DEFAULTS = {
   health: 100,
   energy: 80,
@@ -42,7 +43,7 @@ function getAgentLocalTiles(world, agentId) {
   const agent = world.agents[agentId];
   if (!agent) return [];
 
-  const VIEW_RADIUS = 5;
+  const VIEW_RADIUS = AGENT_VIEW_RADIUS;
   const tiles = [];
   for (let dy = -VIEW_RADIUS; dy <= VIEW_RADIUS; dy++) {
     for (let dx = -VIEW_RADIUS; dx <= VIEW_RADIUS; dx++) {
@@ -62,7 +63,7 @@ function getNearbyAgents(world, agentId) {
   const agent = world.agents[agentId];
   if (!agent) return [];
 
-  const VIEW_RADIUS = 5;
+  const VIEW_RADIUS = AGENT_VIEW_RADIUS;
   const nearby = [];
   for (const [id, other] of Object.entries(world.agents)) {
     if (Number(id) === agentId) continue;
@@ -301,7 +302,7 @@ function saveState(world) {
 
 function loadState() {
   try {
-    // Try new split format
+    // Load split format: meta.json + chunk files
     if (fs.existsSync(META_FILE)) {
       const meta = JSON.parse(fs.readFileSync(META_FILE, 'utf-8'));
       const world = {
